@@ -208,10 +208,9 @@ Demo 時應誠實區分「已由自動化測試覆蓋」、「已人工操作驗
 
 ## 專案文件索引
 
-- 正式產品規格：`docs/product/Badminton_Match_Master_PRD_V2.4.md`
+- 正式產品規格：`docs/product/羽點通_PRD_V2.4.md`
 - 技術架構：`docs/architecture/TECHNICAL_ARCHITECTURE_V1.md`
 - 需求與田調：`docs/research/`
 - 開發規劃：`docs/planning/六階段開發藍圖.md`
 - 本機啟動與操作：`docs/development/LOCAL_SETUP.md`
 - 歷史版本：`docs/archive/`
-

@@ -1,4 +1,4 @@
-# Badminton Match Master
+# 羽點通
 
 羽球零打活動、報到、帳務與排點管理系統。
 
@@ -18,7 +18,7 @@ data/reference/       參考資料
 data/samples/         測試用資料
 ```
 
-現行規格請以 [PRD V2.4](docs/product/Badminton_Match_Master_PRD_V2.4.md) 為準，技術決策見 [Technical Architecture V1](docs/architecture/TECHNICAL_ARCHITECTURE_V1.md)。
+現行規格請以 [PRD V2.4](docs/product/羽點通_PRD_V2.4.md) 為準，技術決策見 [Technical Architecture V1](docs/architecture/TECHNICAL_ARCHITECTURE_V1.md)。
 
 所有新頁面、功能修正與重構都必須遵循 PRD 第 14 章的最新視覺規範；若需求與規範衝突，應先更新 PRD 並取得設計決策，再修改程式碼。
 

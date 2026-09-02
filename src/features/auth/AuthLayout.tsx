@@ -19,7 +19,7 @@ export function AuthLayout({ eyebrow, title, footer, children }: AuthLayoutProps
         </Link>
         <div>
           <p className="eyebrow">羽球零打活動管理</p>
-          <h2>少一點手忙腳亂，<br />多一點好球。</h2>
+          <h2>少一點手忙腳亂<br />多一點好球</h2>
           <p>為零打團主設計的活動、收款與排點工作台。</p>
         </div>
       </section>

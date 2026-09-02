@@ -1,6 +1,6 @@
 # 羽球零打與排點系統：技術架構 V1
 
-> 對應產品規格：`../product/Badminton_Match_Master_PRD_V2.4.md`  
+> 對應產品規格：`../product/羽點通_PRD_V2.4.md`
 > 狀態：第一版開發基線  
 > 更新日期：2026-08-28
 

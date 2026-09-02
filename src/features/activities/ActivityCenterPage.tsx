@@ -5,6 +5,8 @@ import { type ActivityStatus, type ActivitySummary, useActivityCenter, useManage
 import { ContentNavigation } from '../../app/ContentWorkspace'
 import { useActivityTemplates } from '../settings/settingsApi'
 import { UNARCHIVED_ACTIVITY_LIMIT } from './activityLimits'
+import { ConfirmDialog } from '../../app/Feedback'
+import { useFeedback } from '../../app/feedbackContext'
 
 type Filter = 'all' | 'in_progress' | 'scheduled' | 'ended' | 'draft' | 'archived'
 
@@ -48,6 +50,8 @@ export function ActivityCenterPage() {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<Filter>('all')
   const [actionError, setActionError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<ActivitySummary | null>(null)
+  const { notify } = useFeedback()
 
   const data = activityCenter.data
   const counts = useMemo(() => {
@@ -69,8 +73,11 @@ export function ActivityCenterPage() {
   const atLimit = data.unarchivedCount >= UNARCHIVED_ACTIVITY_LIMIT
   async function runAction(activity: ActivitySummary, action: 'archive' | 'unarchive' | 'delete') {
     setActionError('')
-    if (action === 'delete' && !window.confirm(`確定要刪除「${activity.title || activity.venue}」嗎？此操作無法復原。`)) return
-    try { await manageActivity.mutateAsync({ activityId: activity.id, action }) }
+    try {
+      await manageActivity.mutateAsync({ activityId: activity.id, action })
+      notify({ message: action === 'delete' ? `已刪除「${activity.title || activity.venue}」。` : action === 'archive' ? `已封存「${activity.title || activity.venue}」。` : `已取消封存「${activity.title || activity.venue}」。`, tone: 'success' })
+      if (action === 'delete') setPendingDelete(null)
+    }
     catch { setActionError(action === 'unarchive' ? `無法取消封存；請確認未封存活動尚未達 ${UNARCHIVED_ACTIVITY_LIMIT} 筆。` : '活動操作失敗，請稍後再試。') }
   }
 
@@ -96,9 +103,10 @@ export function ActivityCenterPage() {
           {activity.status !== 'draft' && <Link to={`/activities/new?copy=${activity.id}`}>複製活動</Link>}
           {activity.status === 'ended' && <button type="button" onClick={() => runAction(activity, 'archive')}>封存活動</button>}
           {activity.status === 'archived' && <button type="button" disabled={atLimit} onClick={() => runAction(activity, 'unarchive')}>取消封存</button>}
-          {(activity.status === 'draft' || activity.status === 'archived') && <button type="button" className="danger-text" onClick={() => runAction(activity, 'delete')}>刪除活動</button>}
+          {(activity.status === 'draft' || activity.status === 'archived') && <button type="button" className="danger-text" onClick={() => setPendingDelete(activity)}>刪除活動</button>}
         </div></details></div>
       </article>)}</div>}
     </section>
+    {pendingDelete && <ConfirmDialog title="刪除活動？" confirmLabel="刪除活動" pending={manageActivity.isPending} onCancel={() => setPendingDelete(null)} onConfirm={() => void runAction(pendingDelete, 'delete')}><p>「{pendingDelete.title || pendingDelete.venue}」及相關資料將永久刪除，此操作無法復原。</p></ConfirmDialog>}
   </div>
 }

@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react'
+import { ConfirmDialog } from '../../app/Feedback'
 import { useActivityMemberDetail, useActivityPaymentSettings, useCancelActivityMember, useCorrectMemberCheckinPayment, useMemberRelationships, useSetMemberPaymentWaiver, useSetMemberRelationships, useUpdateActivityMember, type ActivityWorkspace } from './activityWorkspaceApi'
 
 type Props = { workspace: ActivityWorkspace; memberId: string; onClose: () => void }
@@ -20,6 +21,7 @@ export function MemberDetailPanel({ workspace, memberId, onClose }: Props) {
   const [search, setSearch] = useState('')
   const [message, setMessage] = useState('')
   const [confirmLevelWarning, setConfirmLevelWarning] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [checkinStatus, setCheckinStatus] = useState<'not_arrived' | 'checked_in'>('not_arrived')
   const [paymentStatus, setPaymentStatus] = useState<'unpaid' | 'paid'>('unpaid')
   const [paymentMethod, setPaymentMethod] = useState('')
@@ -73,11 +75,10 @@ export function MemberDetailPanel({ workspace, memberId, onClose }: Props) {
   }
 
   async function cancel() {
-    if (!window.confirm(`確定取消「${member.display_name}」？取消後會從有效名單與應收金額排除。`)) return
-    try { await cancelMember.mutateAsync(memberId); onClose() } catch { setMessage(member.attendance_state === 'playing' ? '球友正在比賽中，結束比賽後才能取消。' : '取消失敗，請重新整理後再試。') }
+    try { await cancelMember.mutateAsync(memberId); setShowCancelConfirm(false); onClose() } catch { setShowCancelConfirm(false); setMessage(member.attendance_state === 'playing' ? '球友正在比賽中，結束比賽後才能取消。' : '取消失敗，請重新整理後再試。') }
   }
 
-  return <div className="panel-backdrop" role="presentation"><section className="side-panel member-detail-panel" role="dialog" aria-modal="true" aria-labelledby="member-detail-title">
+  return <><div className="panel-backdrop" role="presentation"><section className="side-panel member-detail-panel" role="dialog" aria-modal="true" aria-labelledby="member-detail-title">
     <header><div><p className="eyebrow">球友資料</p><h2 id="member-detail-title">{member.display_name}</h2></div><button className="icon-button" onClick={onClose} aria-label="關閉">×</button></header>
     <form className="form-stack" onSubmit={submit}>
       <label>姓名<input name="displayName" required defaultValue={member.display_name} /></label>
@@ -88,7 +89,7 @@ export function MemberDetailPanel({ workspace, memberId, onClose }: Props) {
       <label>備註（非必填）<textarea name="note" defaultValue={member.note ?? ''} /></label>
       <fieldset className="relationship-fieldset"><legend>排點關係</legend><p className="muted">單場關係會在兩人共同完成一次安排後自動解除。避免同場的優先權最高。</p><div className="form-stack relationship-selects"><label>長期同隊<select value={persistentBindId} onChange={(event) => setPersistentBindId(event.target.value)}><option value="">不設定</option>{relationshipCandidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.display_name} · Lv.{candidate.level}</option>)}</select></label><label>僅綁一場<select value={oneMatchBindId} onChange={(event) => setOneMatchBindId(event.target.value)}><option value="">不設定</option>{relationshipCandidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.display_name} · Lv.{candidate.level}</option>)}</select></label><label>指定對戰一場<select value={oneMatchOpposeId} onChange={(event) => setOneMatchOpposeId(event.target.value)}><option value="">不設定</option>{relationshipCandidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.display_name} · Lv.{candidate.level}</option>)}</select></label></div><div className="relationship-avoid"><label className="field-label" htmlFor="avoid-member-search">避免同場</label><input id="avoid-member-search" placeholder="輸入姓名搜尋" value={search} onChange={(event) => setSearch(event.target.value)} /><div className="avoid-list">{avoidCandidates.map((candidate) => <label key={candidate.id}><input type="checkbox" checked={avoidIds.includes(candidate.id)} onChange={(event) => setAvoidIds((current) => event.target.checked ? [...current, candidate.id] : current.filter((id) => id !== candidate.id))} />{candidate.display_name}<small>Lv.{candidate.level}</small></label>)}{avoidCandidates.length === 0 && <span className="muted">沒有符合的球友</span>}</div></div></fieldset>
       {message && <div className="validation-box"><p>{message}</p></div>}
-      <footer className="panel-actions split"><button type="button" className="danger-button" disabled={cancelMember.isPending} onClick={cancel}>取消此球友</button><span /><button type="button" className="secondary-button" onClick={onClose}>關閉</button><button className="primary-button" disabled={updateMember.isPending || setRelationships.isPending || correctStatus.isPending || setWaiver.isPending}>{updateMember.isPending || setRelationships.isPending || correctStatus.isPending || setWaiver.isPending ? '儲存中…' : confirmLevelWarning ? '仍要儲存' : '儲存變更'}</button></footer>
+      <footer className="panel-actions split"><button type="button" className="danger-button" disabled={cancelMember.isPending} onClick={() => setShowCancelConfirm(true)}>取消此球友</button><span /><button type="button" className="secondary-button" onClick={onClose}>關閉</button><button className="primary-button" disabled={updateMember.isPending || setRelationships.isPending || correctStatus.isPending || setWaiver.isPending}>{updateMember.isPending || setRelationships.isPending || correctStatus.isPending || setWaiver.isPending ? '儲存中…' : confirmLevelWarning ? '仍要儲存' : '儲存變更'}</button></footer>
     </form>
-  </section></div>
+  </section></div>{showCancelConfirm && <ConfirmDialog title={`取消「${member.display_name}」？`} confirmLabel="取消球友" pending={cancelMember.isPending} onCancel={() => setShowCancelConfirm(false)} onConfirm={() => void cancel()}><p>取消後會從有效名單與應收金額排除。</p></ConfirmDialog>}</>
 }
