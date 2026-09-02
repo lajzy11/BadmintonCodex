@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { useActivityPaymentSettings, useActivityShareData, useActivityWorkspace, useAddActivityMember, useBatchCheckin, type ActivityShareData, type ActivityWorkspace } from './activityWorkspaceApi'
+import { useActivityPaymentSettings, useActivityShareData, useActivityWorkspace, useAddActivityMember, useBatchCheckin, useSetMemberRelationships, type ActivityShareData, type ActivityWorkspace } from './activityWorkspaceApi'
 import { MemberDetailPanel } from './MemberDetailPanel'
 import { ImportMembersPanel } from '../members/ImportMembersPanel'
 import { DispatchBoard, EndActivityPanel } from '../dispatch/DispatchBoard'
@@ -92,10 +92,13 @@ export function ActivityWorkspacePage() {
   const [showShareActivity, setShowShareActivity] = useState(false)
   const [showEndActivity, setShowEndActivity] = useState(false)
   const [searchMembers, setSearchMembers] = useState(false)
+  const [showRelationshipDialog, setShowRelationshipDialog] = useState(false)
+  const [relationshipType, setRelationshipType] = useState<'persistent_bind' | 'one_match_bind' | 'one_match_oppose' | 'avoid_same_match'>('persistent_bind')
   const [memberFilters, setMemberFilters] = useState<MemberFilters>(() => ({ search: '', status: 'all', operational: '', plan: '', payment: '', gender: '', attendance: '', level: '', timeEligibility: '', binding: '', sort: 'source', view: typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches ? 'card' : 'table' }))
   const workspaceQuery = useActivityWorkspace(activityId)
   const paymentSettings = useActivityPaymentSettings(activityId)
   const batchCheckin = useBatchCheckin(activityId)
+  const setRelationships = useSetMemberRelationships(activityId)
   const endActivity = useEndActivity(activityId)
   const endReadiness = useActivityEndReadiness(activityId, showEndActivity)
   const tabParam = searchParams.get('tab')
@@ -170,6 +173,27 @@ export function ActivityWorkspacePage() {
     } catch { setActionMessage('操作失敗，名單可能已在其他裝置更新，請重新整理後再試。') }
   }
 
+  async function bindSelectedMembers() {
+    if (selectedIds.length !== 2) return
+    const [memberId, partnerId] = selectedIds
+    try {
+      await setRelationships.mutateAsync({
+        memberId,
+        persistentBindMemberId: relationshipType === 'persistent_bind' ? partnerId : null,
+        oneMatchBindMemberId: relationshipType === 'one_match_bind' ? partnerId : null,
+        oneMatchOpposeMemberId: relationshipType === 'one_match_oppose' ? partnerId : null,
+        avoidSameMatchMemberIds: relationshipType === 'avoid_same_match' ? [partnerId] : [],
+      })
+      const selectedNames = workspace.members.filter((member) => selectedIds.includes(member.id)).map((member) => member.display_name)
+      setActionMessage(`已設定 ${selectedNames.join('、')} 的排點關係。`)
+      setShowRelationshipDialog(false)
+      setSelectedIds([])
+    } catch {
+      setActionMessage('無法設定排點關係；所選球友可能已有衝突的關係。')
+      setShowRelationshipDialog(false)
+    }
+  }
+
   async function confirmEndActivity() {
     try {
       const result = await endActivity.mutateAsync(Boolean(endReadiness.data?.queued_members))
@@ -205,7 +229,8 @@ export function ActivityWorkspacePage() {
   {tab === 'overview' && <SelfCheckinAdmin activityId={activityId} />}
   {tab === 'overview' && <OverviewInsights workspace={workspace} onOpenMembers={openMemberList} />}
   {tab === 'overview' && <section className="overview-management"><div><strong>活動管理</strong><span>範本可用於快速建立相同設定的活動</span></div><div className="overview-management-actions"><ActivitySecondaryActions activityId={activityId} status={activity.status} suggestedName={activity.custom_title || activity.venue_snapshot.name} />{activity.status === 'in_progress' && <button className="danger-button" onClick={() => setShowEndActivity(true)}>結束活動</button>}</div></section>}
-  {tab === 'members' && selectedIds.length > 0 && <aside className="member-batch-dock" aria-label="批次報到工具列"><strong>已選 {selectedIds.length} 人</strong><div className="member-batch-dock-actions">{selectedIds.length === 1 && <button className="text-button member-detail-shortcut" onClick={() => setDetailMemberId(selectedIds[0])}>球友詳情</button>}{settings?.finance_enabled && <label><span>付款方式</span><select aria-label="批次收款付款方式" value={effectivePaymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>{settings.enabled_payment_methods.map((method) => <option value={method} key={method}>{paymentLabels[method] ?? method}</option>)}</select></label>}<button className="secondary-button" disabled={batchCheckin.isPending} onClick={() => runBatchAction(false)}>僅報到</button>{settings?.finance_enabled && <button className="primary-button" disabled={batchCheckin.isPending || !effectivePaymentMethod} onClick={() => runBatchAction(true)}>報到並收款</button>}</div><button className="icon-button" aria-label="取消選取" onClick={() => setSelectedIds([])}><MaterialIcon name="close" /></button></aside>}
+  {tab === 'members' && selectedIds.length > 0 && <aside className="member-batch-dock" aria-label="批次報到工具列"><strong>已選 {selectedIds.length} 人</strong><div className="member-batch-dock-actions">{selectedIds.length === 1 && <button className="text-button member-detail-shortcut" onClick={() => setDetailMemberId(selectedIds[0])}>球友詳情</button>}{selectedIds.length === 2 && <button className="secondary-button" onClick={() => setShowRelationshipDialog(true)}><MaterialIcon name="link" />綁定關係</button>}{settings?.finance_enabled && <label><span>付款方式</span><select aria-label="批次收款付款方式" value={effectivePaymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>{settings.enabled_payment_methods.map((method) => <option value={method} key={method}>{paymentLabels[method] ?? method}</option>)}</select></label>}<button className="secondary-button" disabled={batchCheckin.isPending} onClick={() => runBatchAction(false)}>僅報到</button>{settings?.finance_enabled && <button className="primary-button" disabled={batchCheckin.isPending || !effectivePaymentMethod} onClick={() => runBatchAction(true)}>報到並收款</button>}</div><button className="icon-button" aria-label="取消選取" onClick={() => setSelectedIds([])}><MaterialIcon name="close" /></button></aside>}
+  {showRelationshipDialog && selectedIds.length === 2 && <div className="panel-backdrop" role="presentation"><section className="confirm-dialog relationship-dialog" role="dialog" aria-modal="true" aria-labelledby="relationship-dialog-title"><h2 id="relationship-dialog-title">設定兩位球友的排點關係</h2><p>{workspace.members.filter((member) => selectedIds.includes(member.id)).map((member) => member.display_name).join(' ＋ ')}</p><label><span className="field-label">關係類型</span><select value={relationshipType} onChange={(event) => setRelationshipType(event.target.value as typeof relationshipType)}><option value="persistent_bind">長期同隊</option><option value="one_match_bind">僅綁一場</option><option value="one_match_oppose">指定對戰一場</option><option value="avoid_same_match">避免同場</option></select></label><footer><button className="secondary-button" onClick={() => setShowRelationshipDialog(false)}>返回</button><button className="primary-button" disabled={setRelationships.isPending} onClick={() => void bindSelectedMembers()}>{setRelationships.isPending ? '設定中…' : '確認設定'}</button></footer></section></div>}
   {showAddMember && <AddMemberPanel workspace={workspace} onClose={() => setShowAddMember(false)} />}
   {detailMemberId && <MemberDetailPanel workspace={workspace} memberId={detailMemberId} onClose={() => { setDetailMemberId(null); setSelectedIds([]) }} />}
   {showImportMembers && <ImportMembersPanel workspace={workspace} onClose={() => setShowImportMembers(false)} />}

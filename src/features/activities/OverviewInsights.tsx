@@ -24,9 +24,6 @@ export function OverviewInsights({ workspace, onOpenMembers }: { workspace: Acti
     result[member.payment_method!] = { count: current.count + 1, amount: current.amount + amount }
     return result
   }, {})).sort((a, b) => b[1].amount - a[1].amount)
-  const started = active.filter((member) => Date.now() >= new Date(workspace.plans.find((plan) => plan.id === member.plan_id)?.start_at ?? '2999-01-01').getTime())
-  const pendingCheckin = started.filter((member) => member.checkin_status === 'not_arrived').length
-  const pendingPayment = workspace.activity.finance_enabled ? started.filter((member) => member.payment_status === 'unpaid' && member.no_show_status !== 'waived').length : 0
   const unpaidMembers = active.filter((member) => member.payment_status === 'unpaid' && member.no_show_status !== 'waived').length
   const segments: Array<{ start: number; end: number; count: number }> = []
 
@@ -68,7 +65,5 @@ export function OverviewInsights({ workspace, onOpenMembers }: { workspace: Acti
       <div className="plan-chart"><div className="plan-chart-head"><span>方案／時間</span><span>報名人數</span><span>已報到</span>{workspace.activity.finance_enabled && <span>已收</span>}</div>{planStats.map(({ plan, members, arrived, collected }) => <div className="plan-chart-row" key={plan.id}><div><strong>方案 {plan.code}</strong><small>{time(plan.start_at)}–{time(plan.end_at)}{workspace.activity.finance_enabled && ` · $${plan.amount ?? 0}`}</small></div><button onClick={() => onOpenMembers({ plan: plan.id })}><span><i style={{ width: `${percent(members, maxPlanMembers)}%` }} /></span><strong>{members} 人</strong></button><button onClick={() => onOpenMembers({ plan: plan.id, status: 'checked_in' })}>{arrived} 人</button>{workspace.activity.finance_enabled && <button onClick={() => onOpenMembers({ plan: plan.id, payment: 'paid' })}>${collected.toLocaleString()}</button>}</div>)}</div>
       {segments.length > 0 && <div className="time-distribution"><h3>各時段有效人數</h3><p className="muted">依方案有效時間計算</p>{segments.map((segment) => <div key={segment.start}><span>{time(segment.start)}–{time(segment.end)}</span><div><i style={{ width: `${percent(segment.count, maxSegmentMembers)}%` }} /></div><strong>{segment.count} 人</strong></div>)}</div>}
     </section>
-
-    {(pendingCheckin > 0 || pendingPayment > 0) && <section className="dashboard-card attention-section"><header><div><p className="dashboard-kicker">需要處理</p><h2>待處理事項</h2></div></header>{pendingCheckin > 0 && <button onClick={() => onOpenMembers({ status: 'not_arrived', operational: 'pending_checkin' })}>尚未報到 <strong>{pendingCheckin} 人</strong></button>}{pendingPayment > 0 && <button onClick={() => onOpenMembers({ payment: 'unpaid', operational: 'pending_payment' })}>尚未付款 <strong>{pendingPayment} 人</strong></button>}</section>}
   </div>
 }

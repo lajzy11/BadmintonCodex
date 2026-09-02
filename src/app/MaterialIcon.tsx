@@ -1,5 +1,5 @@
 // Paths are from Google's Apache-2.0 licensed Material Icons set.
-type MaterialIconName = 'add' | 'arrowBack' | 'check' | 'checkCircle' | 'close' | 'copy' | 'delete' | 'edit' | 'error' | 'expandMore' | 'filterList' | 'home' | 'info' | 'moreHoriz' | 'moreVert' | 'panelClose' | 'panelOpen' | 'place' | 'refresh' | 'search' | 'settings' | 'share' | 'tableRows' | 'viewModule' | 'volumeUp' | 'warning'
+type MaterialIconName = 'add' | 'arrowBack' | 'check' | 'checkCircle' | 'close' | 'copy' | 'delete' | 'edit' | 'error' | 'expandMore' | 'filterList' | 'home' | 'info' | 'link' | 'moreHoriz' | 'moreVert' | 'panelClose' | 'panelOpen' | 'place' | 'refresh' | 'search' | 'settings' | 'share' | 'tableRows' | 'viewModule' | 'volumeUp' | 'warning'
 
 const paths: Record<MaterialIconName, string> = {
   add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
@@ -15,6 +15,7 @@ const paths: Record<MaterialIconName, string> = {
   filterList: 'M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z',
   home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
   info: 'M11 17h2v-6h-2v6zm1-15a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM11 9h2V7h-2v2z',
+  link: 'M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8v2zm9-6h-4v1.9h4a3.1 3.1 0 1 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z',
   moreHoriz: 'M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z',
   panelClose: 'M20 4h-2v16h2V4zM16 11H7.83l3.58-3.59L10 6l-6 6 6 6 1.41-1.41L7.83 13H16v-2z',
   panelOpen: 'M4 4h2v16H4V4zm4 7v2h8.17l-3.58 3.59L14 18l6-6-6-6-1.41 1.41L16.17 11H8z',
