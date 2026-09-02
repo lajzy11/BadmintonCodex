@@ -1,0 +1,11 @@
+packages:
+  - .
+
+allowBuilds:
+  esbuild: true
+
+onlyBuiltDependencies:
+  - esbuild
+  - supabase
+
+confirmModulesPurge: false

@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>羽點通 - 專業羽球零打排點與活動管理系統</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f4f4f5',
+              100: '#e4e4e7',
+              200: '#d4d4d8',
+              500: '#71717a',
+              700: '#3f3f46',
+              800: '#27272a',
+              900: '#18181b',
+              950: '#09090b',
+            },
+            accent: {
+              emerald: '#10b981',
+              amber: '#f59e0b',
+              sky: '#0284c7',
+              blue: '#2563eb',
+              rose: '#f43f5e'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel compiler -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+      user-select: none;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.05);
+    }
+    .dark .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.05);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(150,150,150,0.3);
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(150,150,150,0.5);
+    }
+  </style>
+</head>
+<body class="bg-zinc-100 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 min-h-screen transition-colors duration-200">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // Built-in Taipei Badminton Venues Database
+    const TAIPEI_VENUES = [
+      { name: '臺北市中山運動中心羽球館', address: '臺北市中山區中山北路二段44巷2號', defaultCourts: 10 },
+      { name: '臺北市大安運動中心羽球場', address: '臺北市大安區辛亥路三段55號', defaultCourts: 8 },
+      { name: '臺北市中正運動中心羽球場', address: '臺北市中正區信義路一段1號', defaultCourts: 8 },
+      { name: '臺北市信義運動中心羽球場', address: '臺北市信義區松勤街178號', defaultCourts: 6 },
+      { name: '臺北市士林運動中心羽球館', address: '臺北市士林區士商路1號', defaultCourts: 6 },
+      { name: '臺北市南港運動中心羽球場', address: '臺北市南港區玉成街69號', defaultCourts: 6 },
+      { name: '臺北市內湖運動中心羽球場', address: '臺北市內湖區洲子街12號', defaultCourts: 8 },
+      { name: '臺北市文山運動中心羽球館', address: '臺北市文山區興隆路三段222號', defaultCourts: 6 },
+      { name: '臺北體育館 (紅館 7樓羽球場)', address: '臺北市松山區南京東路四段10號', defaultCourts: 12 },
+      { name: '華江高中羽球館', address: '臺北市萬華區西藏路213號', defaultCourts: 10 },
+      { name: '亞柏羽球會館 (台北館)', address: '臺北市內湖區康寧路三段220號', defaultCourts: 8 },
+      { name: '臺北市網球中心室內羽球場', address: '臺北市內湖區民權東路六段208號', defaultCourts: 8 },
+    ];
+
+    // Initial Event Settings Template
+    const INITIAL_EVENT_CONFIG = {
+      id: 'EVT-20260826-01',
+      groupName: '羽動奇蹟羽球俱樂部',
+      venueName: '臺北市中山運動中心羽球館',
+      venueAddress: '臺北市中山區中山北路二段44巷2號',
+      date: '2026-08-26',
+      skillMin: 4,
+      skillMax: 14,
+      mode: 'system', // 'free' | 'manual' | 'system'
+      openRegTime: '2026-08-20T12:00',
+      shuttlecock: 'VICTOR Champion No.1 (勝利1號)',
+      courtCount: 3,
+      notes: '請穿著不印痕羽球鞋入場。現場提供飲水機與淋浴設施，請自備毛巾。遲到超過 15 分鐘未報到者視同棄權。',
+      contactInfo: '團主 Line: @badminton_pro / 電話: 0912-345-678',
+      enableAccounting: true,
+      autoMarkTimeUp: false,
+      paymentMethods: ['現金', '轉帳', 'Line Pay', '球券'],
+      plans: [
+        { id: 'A', timeStart: '09:00', timeEnd: '12:00', price: 400, defaultPayment: 'Line Pay' },
+        { id: 'B', timeStart: '09:00', timeEnd: '11:00', price: 280, defaultPayment: '現金' },
+        { id: 'C', timeStart: '10:00', timeEnd: '12:00', price: 280, defaultPayment: '轉帳' }
+      ]
+    };
+
+    const INITIAL_PLAYERS = [
+      { id: 'P01', name: '陳小龍', gender: 'M', level: 10, planId: 'A', status: 'checked_in', paid: true, paymentMethod: 'Line Pay', checkInTime: '08:50', boundWith: null },
+      { id: 'P02', name: '李國強', gender: 'M', level: 9, planId: 'A', status: 'checked_in', paid: true, paymentMethod: '現金', checkInTime: '08:55', boundWith: null },
+      { id: 'P03', name: '王威廉', gender: 'M', level: 11, planId: 'A', status: 'checked_in', paid: true, paymentMethod: '轉帳', checkInTime: '08:58', boundWith: null },
+      { id: 'P04', name: '黃建勳', gender: 'M', level: 8, planId: 'B', status: 'checked_in', paid: true, paymentMethod: '現金', checkInTime: '09:02', boundWith: null },
+      { id: 'P05', name: '林婷婷', gender: 'F', level: 7, planId: 'A', status: 'checked_in', paid: true, paymentMethod: 'Line Pay', checkInTime: '08:45', boundWith: null },
+      { id: 'P06', name: '張哲銘', gender: 'M', level: 12, planId: 'A', status: 'checked_in', paid: true, paymentMethod: '現金', checkInTime: '09:00', boundWith: null },
+      { id: 'P07', name: '趙采婕', gender: 'F', level: 8, planId: 'B', status: 'checked_in', paid: true, paymentMethod: 'Line Pay', checkInTime: '08:52', boundWith: null },
+      { id: 'P08', name: '吳美玲', gender: 'F', level: 6, planId: 'C', status: 'checked_in', paid: false, paymentMethod: '', checkInTime: '09:05', boundWith: null },
+      { id: 'P09', name: '許家豪', gender: 'M', level: 10, planId: 'A', status: 'checked_in', paid: true, paymentMethod: 'Line Pay', checkInTime: '08:50', boundWith: null },
+      { id: 'P10', name: '楊雅婷', gender: 'F', level: 7, planId: 'B', status: 'unchecked', paid: false, paymentMethod: '', checkInTime: null, boundWith: null },
+      { id: 'P11', name: '劉志明', gender: 'M', level: 9, planId: 'A', status: 'checked_in', paid: true, paymentMethod: '轉帳', checkInTime: '08:58', boundWith: null },
+      { id: 'P12', name: '蔡佩蓁', gender: 'F', level: 8, planId: 'C', status: 'checked_in', paid: true, paymentMethod: '現金', checkInTime: '09:10', boundWith: null },
+      { id: 'P13', name: '鄭博文', gender: 'M', level: 13, planId: 'A', status: 'unchecked', paid: false, paymentMethod: '', checkInTime: null, boundWith: null },
+      { id: 'P14', name: '謝沛珊', gender: 'F', level: 7, planId: 'B', status: 'checked_in', paid: true, paymentMethod: 'Line Pay', checkInTime: '09:00', boundWith: null },
+      { id: 'P15', name: '郭冠霖', gender: 'M', level: 9, planId: 'A', status: 'resting', paid: true, paymentMethod: '球券', checkInTime: '08:40', boundWith: null },
+    ];
+
+    function App() {
+      // Theme State
+      const [isDark, setIsDark] = useState(true);
+      const [activeTab, setActiveTab] = useState('matchmaking'); // 'overview' | 'matchmaking' | 'checkin'
+      
+      // Toast Notification State
+      const [toastMsg, setToastMsg] = useState(null);
+      const showToast = (message) => {
+        setToastMsg(message);
+        setTimeout(() => setToastMsg(null), 3000);
+      };
+
+      // Host Auth State
+      const [host, setHost] = useState({
+        name: '',
+        email: '',
+        isLoggedIn: false
+      });
+
+      // Active Event State
+      const [hasActiveEvent, setHasActiveEvent] = useState(false);
+      const [eventConfig, setEventConfig] = useState(INITIAL_EVENT_CONFIG);
+      const [showConfigModal, setShowConfigModal] = useState(false);
+      const [savedTemplates, setSavedTemplates] = useState([
+        { id: 'TPL-01', name: '中山週六早班標準範本', config: { ...INITIAL_EVENT_CONFIG } }
+      ]);
+
+      // Players & Match State
+      const [players, setPlayers] = useState(INITIAL_PLAYERS);
+      const [courts, setCourts] = useState([
+        { id: 'C1', name: '第 1 場地', players: ['P01', 'P05', 'P04', 'P07'], status: 'playing', startTime: Date.now() - 600000 },
+        { id: 'C2', name: '第 2 場地', players: ['P02', 'P03', 'P08', 'P06'], status: 'playing', startTime: Date.now() - 300000 },
+        { id: 'C3', name: '第 3 場地', players: [], status: 'idle', startTime: null },
+      ]);
+      const [queues, setQueues] = useState([
+        { id: 'Q1', name: '預排隊列 A', players: ['P09', 'P11', 'P14', 'P12'] }
+      ]);
+      const [matchHistory, setMatchHistory] = useState([
+        { id: 'H1', courtName: '第 1 場地', teamA: ['陳小龍', '李國強'], teamB: ['王威廉', '黃建勳'], score: '15 - 21', endTime: '09:20' },
+        { id: 'H2', courtName: '第 2 場地', teamA: ['林婷婷', '張哲銘'], teamB: ['趙采婕', '吳美玲'], score: '21 - 18', endTime: '09:15' }
+      ]);
+
+      // Selected Players for Check-in Grid Multi-select
+      const [selectedCheckInIds, setSelectedCheckInIds] = useState([]);
+
+      // Player Quick Action Modal / Context Menu
+      const [contextPlayer, setContextPlayer] = useState(null);
+
+      // Web Speech Utterance Voice Callout
+      const speakText = (text) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'zh-TW';
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          window.speechSynthesis.speak(utterance);
+        } else {
+          showToast('您的瀏覽器不支援語音廣播功能。');
+        }
+      };
+
+      // Toggle Dark Mode
+      useEffect(() => {
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }, [isDark]);
+
+      // Effect: Automatic player status update according to Plan timeEnd (if enabled)
+      // Protection Rule: Skip players currently playing on any court.
+      useEffect(() => {
+        if (!eventConfig.autoMarkTimeUp) return;
+
+        const checkPlanTimes = () => {
+          const now = new Date();
+          const currentHours = String(now.getHours()).padStart(2, '0');
+          const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+          const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+          // Get set of players currently on court
+          const playersOnCourts = new Set(courts.flatMap(c => c.players));
+
+          setPlayers(prevPlayers => prevPlayers.map(player => {
+            if (player.status === 'unchecked') return player;
+
+            // If player is currently playing on court, do NOT switch to time_up yet
+            if (playersOnCourts.has(player.id)) return player;
+
+            const plan = eventConfig.plans.find(p => p.id === player.planId);
+            if (!plan || !plan.timeEnd) return player;
+
+            // Check if current time reached or passed plan's end time
+            if (currentTimeStr >= plan.timeEnd && player.status !== 'time_up') {
+              return { ...player, status: 'time_up' };
+            }
+            return player;
+          }));
+        };
+
+        checkPlanTimes();
+        const intervalId = setInterval(checkPlanTimes, 30000); // Check every 30s
+        return () => clearInterval(intervalId);
+      }, [eventConfig.autoMarkTimeUp, eventConfig.plans, courts]);
+
+      // Handle Event Creation / Template Import Actions
+      const handleCreateNewEvent = () => {
+        const newEvent = {
+          ...INITIAL_EVENT_CONFIG,
+          id: 'EVT-' + Date.now().toString().slice(-6),
+          groupName: `${host.name.replace(' 團主', '')}羽球球友會`,
+          date: new Date().toISOString().split('T')[0]
+        };
+        setEventConfig(newEvent);
+        setHasActiveEvent(true);
+        setShowConfigModal(true);
+      };
+
+      const handleImportTemplate = (template) => {
+        const newEvent = {
+          ...template.config,
+          id: 'EVT-' + Date.now().toString().slice(-6),
+          date: new Date().toISOString().split('T')[0]
+        };
+        setEventConfig(newEvent);
+        setHasActiveEvent(true);
+      };
+
+      // Handle Logout
+      const handleLogout = () => {
+        setHost({ name: '', email: '', isLoggedIn: false });
+        setHasActiveEvent(false);
+      };
+
+      // 1. Step 1: Render Auth Screen if not logged in
+      if (!host.isLoggedIn) {
+        return (
+          <AuthScreen 
+            onLoginSuccess={(userData) => {
+              setHost({ name: userData.name, email: userData.email, isLoggedIn: true });
+            }}
+          />
+        );
+      }
+
+      // 2. Step 2: Render Event Selection Dashboard if logged in but no active event selected
+      if (!hasActiveEvent) {
+        return (
+          <EventSelectionScreen 
+            host={host}
+            savedTemplates={savedTemplates}
+            onCreateNew={handleCreateNewEvent}
+            onImportTemplate={handleImportTemplate}
+            onLogout={handleLogout}
+          />
+        );
+      }
+
+      // 3. Step 3: Main Management Interface with Active Event
+      return (
+        <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 relative">
+          
+          {/* Toast Alert Popup */}
+          {toastMsg && (
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-zinc-900/90 dark:bg-zinc-100/90 text-white dark:text-zinc-900 px-4 py-2 rounded-lg shadow-xl text-xs font-semibold backdrop-blur border border-zinc-700 dark:border-zinc-300 animate-bounce">
+              📢 {toastMsg}
+            </div>
+          )}
+
+          {/* Top Header Navigation */}
+          <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-30 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                
+                {/* Brand Logo & Event Badge */}
+                <div className="flex items-center space-x-3">
+                  <button 
+                    onClick={() => setHasActiveEvent(false)}
+                    title="回到主控制台切換活動"
+                    className="w-9 h-9 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center font-bold text-lg hover:opacity-80 transition"
+                  >
+                    羽
+                  </button>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h1 className="font-semibold text-base tracking-tight">{eventConfig.groupName}</h1>
+                      <span className="text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono">
+                        {eventConfig.id}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {eventConfig.venueName} • {eventConfig.date}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tab Controls */}
+                <nav className="hidden md:flex space-x-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-sm font-medium">
+                  <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`px-4 py-1.5 rounded-md transition-all ${
+                      activeTab === 'overview'
+                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    📊 概況總覽
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('matchmaking')}
+                    className={`px-4 py-1.5 rounded-md transition-all ${
+                      activeTab === 'matchmaking'
+                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    ⚔️ 排點作業
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('checkin')}
+                    className={`px-4 py-1.5 rounded-md transition-all ${
+                      activeTab === 'checkin'
+                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    ✅ 現場報到 ({players.filter(p => p.status === 'checked_in').length}/{players.length})
+                  </button>
+                </nav>
+
+                {/* Actions & Host User Controls */}
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setHasActiveEvent(false)}
+                    className="hidden lg:inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                  >
+                    📋 切換活動
+                  </button>
+                  <button
+                    onClick={() => setShowConfigModal(true)}
+                    className="hidden sm:inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition"
+                  >
+                    ⚙️ 開團設定
+                  </button>
+
+                  {/* Dark Mode Switcher */}
+                  <button
+                    onClick={() => setIsDark(!isDark)}
+                    title="切換深色/淺色模式"
+                    className="p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition"
+                  >
+                    {isDark ? '☀️' : '🌙'}
+                  </button>
+
+                  {/* Host Logout */}
+                  <button
+                    onClick={handleLogout}
+                    title="登出帳號"
+                    className="flex items-center space-x-2 pl-2 border-l border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-rose-500"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center font-bold text-xs">
+                      {host.name.charAt(0)}
+                    </div>
+                    <span className="hidden lg:inline">登出</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mobile Tab Nav */}
+              <div className="flex md:hidden border-t border-zinc-200 dark:border-zinc-800 py-2 justify-around text-xs font-medium">
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className={`py-1 px-3 rounded ${activeTab === 'overview' ? 'bg-zinc-200 dark:bg-zinc-800 font-bold' : ''}`}
+                >
+                  概況總覽
+                </button>
+                <button
+                  onClick={() => setActiveTab('matchmaking')}
+                  className={`py-1 px-3 rounded ${activeTab === 'matchmaking' ? 'bg-zinc-200 dark:bg-zinc-800 font-bold' : ''}`}
+                >
+                  排點作業
+                </button>
+                <button
+                  onClick={() => setActiveTab('checkin')}
+                  className={`py-1 px-3 rounded ${activeTab === 'checkin' ? 'bg-zinc-200 dark:bg-zinc-800 font-bold' : ''}`}
+                >
+                  現場報到
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content Body */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            {activeTab === 'overview' && (
+              <OverviewTab 
+                eventConfig={eventConfig} 
+                setEventConfig={setEventConfig}
+                players={players} 
+                matchHistory={matchHistory}
+                savedTemplates={savedTemplates}
+                setSavedTemplates={setSavedTemplates}
+                showToast={showToast}
+              />
+            )}
+
+            {activeTab === 'matchmaking' && (
+              <MatchmakingTab 
+                eventConfig={eventConfig}
+                players={players}
+                setPlayers={setPlayers}
+                courts={courts}
+                setCourts={setCourts}
+                queues={queues}
+                setQueues={setQueues}
+                matchHistory={matchHistory}
+                setMatchHistory={setMatchHistory}
+                speakText={speakText}
+                setContextPlayer={setContextPlayer}
+                showToast={showToast}
+              />
+            )}
+
+            {activeTab === 'checkin' && (
+              <CheckInTab 
+                eventConfig={eventConfig}
+                players={players}
+                setPlayers={setPlayers}
+                selectedCheckInIds={selectedCheckInIds}
+                setSelectedCheckInIds={setSelectedCheckInIds}
+                showToast={showToast}
+              />
+            )}
+          </main>
+
+          {/* Create/Edit Event Modal */}
+          {showConfigModal && (
+            <EventConfigModal 
+              eventConfig={eventConfig} 
+              setEventConfig={setEventConfig} 
+              onClose={() => setShowConfigModal(false)} 
+            />
+          )}
+
+          {/* Player Quick Action Popup */}
+          {contextPlayer && (
+            <PlayerContextModal 
+              player={contextPlayer}
+              players={players}
+              setPlayers={setPlayers}
+              onClose={() => setContextPlayer(null)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    function OverviewTab({ eventConfig, setEventConfig, players, matchHistory, savedTemplates, setSavedTemplates, showToast }) {
+      const checkedInCount = players.filter(p => p.status === 'checked_in').length;
+      
+      const totalRevenue = useMemo(() => {
+        return players.reduce((sum, p) => {
+          if (!p.paid) return sum;
+          const plan = eventConfig.plans.find(pl => pl.id === p.planId);
+          return sum + (plan ? plan.price : 0);
+        }, 0);
+      }, [players, eventConfig.plans]);
+
+      const unpaidCount = players.filter(p => !p.paid).length;
+
+      const handleSaveAsTemplate = () => {
+        const defaultName = `${eventConfig.groupName} - 設定範本`;
+        const newTpl = {
+          id: 'TPL-' + Date.now().toString().slice(-4),
+          name: defaultName,
+          config: { ...eventConfig }
+        };
+        setSavedTemplates([...savedTemplates, newTpl]);
+        showToast('已成功儲存為開團範本！');
+      };
+
+      // Export full activity archive
+      const handleExportArchive = () => {
+        const archiveData = {
+          exportTimestamp: new Date().toISOString(),
+          systemVersion: "1.0.0",
+          eventConfig,
+          players,
+          matchHistory,
+          statistics: {
+            totalPlayers: players.length,
+            checkedInCount,
+            totalRevenue,
+            unpaidCount,
+            totalMatchesPlayed: matchHistory.length
+          }
+        };
+
+        const jsonString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(archiveData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", jsonString);
+        downloadAnchor.setAttribute("download", `badminton_archive_${eventConfig.id}_${eventConfig.date}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Top Stat Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
+              <p className="text-xs text-zinc-500 font-medium">總報名人數 / 報到數</p>
+              <div className="flex items-baseline space-x-2 mt-1">
+                <span className="text-2xl font-bold font-mono">{checkedInCount}</span>
+                <span className="text-xs text-zinc-400">/ {players.length} 人</span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
+              <p className="text-xs text-zinc-500 font-medium">已進行對戰總數</p>
+              <div className="flex items-baseline space-x-2 mt-1">
+                <span className="text-2xl font-bold font-mono">{matchHistory.length}</span>
+                <span className="text-xs text-zinc-400">場次</span>
+              </div>
+            </div>
+
+            {eventConfig.enableAccounting && (
+              <>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
+                  <p className="text-xs text-zinc-500 font-medium">實收費用總計</p>
+                  <div className="flex items-baseline space-x-1 mt-1 text-emerald-600 dark:text-emerald-400">
+                    <span className="text-2xl font-bold font-mono">${totalRevenue}</span>
+                    <span className="text-xs">NTD</span>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
+                  <p className="text-xs text-zinc-500 font-medium">待催繳人數</p>
+                  <div className="flex items-baseline space-x-1 mt-1 text-rose-500">
+                    <span className="text-2xl font-bold font-mono">{unpaidCount}</span>
+                    <span className="text-xs text-zinc-400">人未付</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Main Details Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl space-y-4 shadow-sm">
+              <div className="flex flex-wrap justify-between items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <h3 className="font-bold text-sm">📌 活動基本資訊</h3>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleSaveAsTemplate}
+                    className="text-xs px-2.5 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                  >
+                    💾 存為開團範本
+                  </button>
+                  <button
+                    onClick={handleExportArchive}
+                    className="text-xs px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition"
+                  >
+                    📦 匯出完整活動封存
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">球團名稱</span>
+                  <span className="font-semibold">{eventConfig.groupName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">活動場地</span>
+                  <span className="font-semibold">{eventConfig.venueName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">地址</span>
+                  <span className="text-zinc-400">{eventConfig.venueAddress}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">活動日期</span>
+                  <span className="font-mono font-semibold">{eventConfig.date}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">自動時間到標記</span>
+                  <span className={eventConfig.autoMarkTimeUp ? 'text-blue-500 font-bold' : 'text-zinc-400'}>
+                    {eventConfig.autoMarkTimeUp ? '已開啟 (離場時轉時間到)' : '已關閉 (手動切換)'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">指定用球</span>
+                  <span>{eventConfig.shuttlecock}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">建議程度範圍</span>
+                  <span className="font-mono">{eventConfig.skillMin} - {eventConfig.skillMax} 級</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">團主聯絡方式</span>
+                  <span>{eventConfig.contactInfo}</span>
+                </div>
+              </div>
+
+              {eventConfig.notes && (
+                <div className="mt-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  <p className="font-semibold text-zinc-800 dark:text-zinc-200 mb-1">📢 注意事項：</p>
+                  {eventConfig.notes}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl space-y-4 shadow-sm">
+              <h3 className="font-bold text-sm border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                💳 收費方案與預約統計
+              </h3>
+
+              <div className="space-y-3">
+                {eventConfig.plans.map(plan => {
+                  const planPlayers = players.filter(p => p.planId === plan.id);
+                  const paidInPlan = planPlayers.filter(p => p.paid).length;
+
+                  return (
+                    <div key={plan.id} className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 text-xs space-y-2">
+                      <div className="flex justify-between items-center font-bold">
+                        <span className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 font-mono">方案 {plan.id}</span>
+                          <span>{plan.timeStart} - {plan.timeEnd}</span>
+                        </span>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400">${plan.price}</span>
+                      </div>
+
+                      <div className="flex justify-between text-zinc-500 text-[11px]">
+                        <span>預約人數: <strong className="text-zinc-800 dark:text-zinc-200">{planPlayers.length}</strong> 人</span>
+                        <span>已繳費: <strong className="text-emerald-600">{paidInPlan}</strong> / {planPlayers.length}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AuthScreen({ onLoginSuccess }) {
+      const [isLogin, setIsLogin] = useState(true);
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [confirmPassword, setConfirmPassword] = useState('');
+      const [errorMessage, setErrorMessage] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setErrorMessage('');
+
+        if (isLogin) {
+          // 登入模式：只要帳號與密碼有填寫即可成功登入，不需比對確認密碼
+          if (!email.trim() || !password) {
+            setErrorMessage('請填寫完整帳號與密碼欄位。');
+            return;
+          }
+
+          const namePart = email.includes('@') ? email.split('@')[0] : email;
+          const displayName = `${namePart} 團主`;
+
+          onLoginSuccess({
+            email: email.trim(),
+            name: displayName
+          });
+        } else {
+          // 註冊模式：需檢查所有欄位並比對兩次密碼是否相符
+          if (!email.trim() || !password || !confirmPassword) {
+            setErrorMessage('請填寫所有欄位。');
+            return;
+          }
+
+          if (password !== confirmPassword) {
+            setErrorMessage('確認密碼與密碼不相符，請重新確認。');
+            return;
+          }
+
+          const namePart = email.includes('@') ? email.split('@')[0] : email;
+          const displayName = `${namePart} 團主`;
+
+          onLoginSuccess({
+            email: email.trim(),
+            name: displayName
+          });
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-center items-center p-4">
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 font-extrabold text-2xl flex items-center justify-center mx-auto shadow-md">
+                羽
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight">羽點通 - 團主管理系統</h1>
+              <p className="text-xs text-zinc-400">專業羽球零打報到、自動化排點與財務結算</p>
+            </div>
+
+            <div className="grid grid-cols-2 p-1 bg-zinc-800 rounded-lg text-sm font-medium">
+              <button
+                type="button"
+                onClick={() => { setIsLogin(true); setErrorMessage(''); }}
+                className={`py-2 rounded-md transition ${isLogin ? 'bg-zinc-100 text-zinc-900 font-bold' : 'text-zinc-400 hover:text-white'}`}
+              >
+                團主登入
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsLogin(false); setErrorMessage(''); }}
+                className={`py-2 rounded-md transition ${!isLogin ? 'bg-zinc-100 text-zinc-900 font-bold' : 'text-zinc-400 hover:text-white'}`}
+              >
+                註冊新帳號
+              </button>
+            </div>
+
+            {errorMessage && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-lg text-xs">
+                ⚠️ {errorMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold mb-1 text-zinc-300">帳號 / 電子郵件</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-zinc-700 bg-zinc-800 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-zinc-300">密碼</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="請輸入密碼"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-zinc-700 bg-zinc-800 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                />
+              </div>
+
+              {/* 確認密碼：只在註冊模式 (!isLogin) 時顯示 */}
+              {!isLogin && (
+                <div>
+                  <label className="block font-semibold mb-1 text-zinc-300">確認密碼</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="再次輸入密碼以確認"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-zinc-700 bg-zinc-800 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-lg bg-zinc-100 text-zinc-900 font-bold hover:bg-white transition text-sm shadow-lg mt-2"
+              >
+                {isLogin ? '登入系統' : '立即免費註冊'}
+              </button>
+            </form>
+
+            <div className="pt-2 border-t border-zinc-800 text-center text-[11px] text-zinc-500">
+              {isLogin ? '登入只需填寫帳號密碼即可快速進入系統' : '請務必確認兩次輸入之密碼一致'}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function EventSelectionScreen({ host, savedTemplates, onCreateNew, onImportTemplate, onLogout }) {
+      return (
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 sm:p-8">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-base">
+                  {host.name.charAt(0)}
+                </div>
+                <div>
+                  <h2 className="font-bold text-base">{host.name} 您好！</h2>
+                  <p className="text-xs text-zinc-400">{host.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={onLogout}
+                className="text-xs px-3 py-1.5 rounded-md border border-zinc-800 hover:bg-zinc-900 text-zinc-400 hover:text-white transition"
+              >
+                登出帳號
+              </button>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold mb-1">請選擇欲進行的開團任務</h3>
+              <p className="text-xs text-zinc-400 mb-6">您可以開啟全新打球場次，或載入先前建立好的設定範本。</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div 
+                  onClick={onCreateNew}
+                  className="group bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-2xl p-6 transition cursor-pointer flex flex-col justify-between space-y-6 shadow-lg"
+                >
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-2xl font-bold">
+                      ➕
+                    </div>
+                    <h4 className="text-lg font-bold group-hover:text-blue-400 transition">新增全新零打活動</h4>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      設定新的打球時間、台北羽球館地點、開放報名時間、收費方案與現場排點模式。
+                    </p>
+                  </div>
+                  <div className="flex items-center text-xs font-bold text-blue-400 group-hover:translate-x-1 transition">
+                    開啟開團表單 ➔
+                  </div>
+                </div>
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-between space-y-4 shadow-lg">
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-2xl font-bold">
+                      📂
+                    </div>
+                    <h4 className="text-lg font-bold">匯入之前存的範本</h4>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      快速一鍵載入已儲存的羽球館地點與收費方案範本。
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-zinc-800">
+                    <p className="text-[11px] font-semibold text-zinc-400">已儲存的範本清單 ({savedTemplates.length})：</p>
+                    {savedTemplates.map((tpl) => (
+                      <div key={tpl.id} className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-800/60 border border-zinc-700 text-xs">
+                        <div>
+                          <p className="font-bold">{tpl.name}</p>
+                          <p className="text-[10px] text-zinc-400">{tpl.config.venueName} • {tpl.config.plans.length} 個方案</p>
+                        </div>
+                        <button
+                          onClick={() => onImportTemplate(tpl)}
+                          className="px-3 py-1 rounded bg-zinc-100 text-zinc-900 font-bold hover:bg-white transition text-xs"
+                        >
+                          載入開團
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MatchmakingTab({ 
+      eventConfig, players, setPlayers, courts, setCourts, queues, setQueues, matchHistory, setMatchHistory, speakText, setContextPlayer, showToast 
+    }) {
+      const [filterTab, setFilterTab] = useState('all'); // 'all'|'checked_in'|'unchecked'|'resting'|'time_up'|'ending_soon'
+      const [selectedPlanFilter, setSelectedPlanFilter] = useState('all'); // Filter by Plan ID
+      const [searchQuery, setSearchQuery] = useState('');
+
+      // Drag and Drop State
+      const [draggedPlayerId, setDraggedPlayerId] = useState(null);
+
+      // Add New Court
+      const handleAddCourt = () => {
+        const nextId = 'C' + (courts.length + 1);
+        const newCourt = {
+          id: nextId,
+          name: `第 ${courts.length + 1} 場地`,
+          players: [],
+          status: 'idle',
+          startTime: null
+        };
+        setCourts([...courts, newCourt]);
+      };
+
+      // Add New Queue Card
+      const handleAddQueue = () => {
+        const queueCode = String.fromCharCode(65 + queues.length);
+        const newQueue = {
+          id: 'Q' + (queues.length + 1),
+          name: `預排隊列 ${queueCode}`,
+          players: []
+        };
+        setQueues([...queues, newQueue]);
+      };
+
+      // Inline Court Name Rename
+      const handleRenameCourt = (courtId, newName) => {
+        setCourts(courts.map(c => c.id === courtId ? { ...c, name: newName } : c));
+      };
+
+      // Finish match & record history
+      // Note: When clicking "完成比賽", if autoMarkTimeUp is enabled, check if players' plan time has passed, and update their status to "time_up" NOW.
+      const handleFinishMatch = (court) => {
+        if (court.players.length === 0) return;
+
+        const courtPlayerNames = court.players.map(pid => {
+          const p = players.find(x => x.id === pid);
+          return p ? p.name : '未知';
+        });
+
+        const newHistory = {
+          id: 'H' + Date.now(),
+          courtName: court.name,
+          teamA: [courtPlayerNames[0] || '空', courtPlayerNames[1] || '空'],
+          teamB: [courtPlayerNames[2] || '空', courtPlayerNames[3] || '空'],
+          score: '完成',
+          endTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setMatchHistory([newHistory, ...matchHistory]);
+        speakText(`${court.name} 比賽結束！請下一組球友準備上場。`);
+
+        // Perform time-up status check on the players who just finished playing on this court
+        const now = new Date();
+        const currentHours = String(now.getHours()).padStart(2, '0');
+        const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+        const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+        setPlayers(prevPlayers => prevPlayers.map(p => {
+          if (court.players.includes(p.id) && eventConfig.autoMarkTimeUp) {
+            const plan = eventConfig.plans.find(pl => pl.id === p.planId);
+            if (plan && plan.timeEnd && currentTimeStr >= plan.timeEnd) {
+              return { ...p, status: 'time_up' };
+            }
+          }
+          return p;
+        }));
+
+        setCourts(courts.map(c => c.id === court.id ? { ...c, players: [], status: 'idle', startTime: null } : c));
+      };
+
+      // Callout Voice for current court
+      const handleCallCourtVoice = (court) => {
+        if (court.players.length < 4) {
+          showToast('場地上人數不足 4 人，無法發起語音喊場。');
+          return;
+        }
+        const pNames = court.players.map(pid => players.find(p => p.id === pid)?.name || '');
+        const announcement = `請 ${pNames[0]}、${pNames[1]} 與 ${pNames[2]}、${pNames[3]} 到 ${court.name} 上場比賽！`;
+        speakText(announcement);
+      };
+
+      // Auto Suggest Matchmaking Logic
+      const handleAutoSuggestMatch = () => {
+        const occupiedIds = new Set([
+          ...courts.flatMap(c => c.players),
+          ...queues.flatMap(q => q.players)
+        ]);
+
+        const available = players.filter(p => p.status === 'checked_in' && !occupiedIds.has(p.id));
+
+        if (available.length < 4) {
+          showToast('目前待場之已報到球友不足 4 人，無法自動安排點名。');
+          return;
+        }
+
+        const sorted = [...available].sort((a, b) => b.level - a.level);
+        const group4 = sorted.slice(0, 4).map(p => p.id);
+
+        const emptyCourt = courts.find(c => c.players.length === 0);
+        if (emptyCourt) {
+          setCourts(courts.map(c => c.id === emptyCourt.id ? { ...c, players: group4, status: 'playing', startTime: Date.now() } : c));
+        } else if (queues.length > 0) {
+          const targetQ = queues[0];
+          setQueues(queues.map(q => q.id === targetQ.id ? { ...q, players: group4 } : q));
+        } else {
+          showToast('所有場地與預排卡皆滿！請先新增場地或預排卡。');
+        }
+      };
+
+      // Drag Handlers
+      const onDragStartPlayer = (e, playerId) => {
+        setDraggedPlayerId(playerId);
+        e.dataTransfer.setData('text/plain', playerId);
+      };
+
+      const onDropToSlot = (e, targetType, targetId, slotIndex) => {
+        e.preventDefault();
+        const pid = draggedPlayerId || e.dataTransfer.getData('text/plain');
+        if (!pid) return;
+
+        const updatedCourts = courts.map(c => ({
+          ...c,
+          players: c.players.filter(id => id !== pid)
+        }));
+
+        const updatedQueues = queues.map(q => ({
+          ...q,
+          players: q.players.filter(id => id !== pid)
+        }));
+
+        if (targetType === 'court') {
+          const targetCourt = updatedCourts.find(c => c.id === targetId);
+          if (targetCourt) {
+            const newPList = [...targetCourt.players];
+            newPList[slotIndex] = pid;
+            targetCourt.players = newPList.filter(Boolean);
+            if (targetCourt.players.length > 0 && !targetCourt.startTime) {
+              targetCourt.startTime = Date.now();
+              targetCourt.status = 'playing';
+            }
+          }
+        } else if (targetType === 'queue') {
+          const targetQueue = updatedQueues.find(q => q.id === targetId);
+          if (targetQueue) {
+            const newPList = [...targetQueue.players];
+            newPList[slotIndex] = pid;
+            targetQueue.players = newPList.filter(Boolean);
+          }
+        }
+
+        setCourts(updatedCourts);
+        setQueues(updatedQueues);
+        setDraggedPlayerId(null);
+      };
+
+      // Filtered players list (Stacked: Status + Plan + Search)
+      const filteredPlayers = players.filter(p => {
+        if (filterTab !== 'all' && p.status !== filterTab) return false;
+        if (selectedPlanFilter !== 'all' && p.planId !== selectedPlanFilter) return false;
+        if (searchQuery && !p.name.includes(searchQuery)) return false;
+        return true;
+      });
+
+      return (
+        <div className="space-y-6">
+          {/* Top Bar Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-semibold">排點模式：</span>
+              <span className="text-xs px-2.5 py-1 rounded bg-zinc-100 dark:bg-zinc-800 font-mono font-bold">
+                {eventConfig.mode === 'system' ? '🤖 系統排點' : eventConfig.mode === 'manual' ? '✋ 人工排點' : '🎾 自由上場'}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {eventConfig.mode === 'system' && (
+                <button
+                  onClick={handleAutoSuggestMatch}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-700 text-white transition shadow-sm"
+                >
+                  ⚡ 系統自動建議排點
+                </button>
+              )}
+              <button
+                onClick={handleAddCourt}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+              >
+                + 新增球場
+              </button>
+              <button
+                onClick={handleAddQueue}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+              >
+                + 新增預排卡
+              </button>
+            </div>
+          </div>
+
+          {/* Top Section: Court & Pre-assign Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {courts.map((court) => (
+              <div 
+                key={court.id} 
+                className="bg-white dark:bg-zinc-900 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 p-4 shadow-sm flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex justify-between items-center pb-2 mb-3 border-b border-zinc-200 dark:border-zinc-800">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <input
+                        type="text"
+                        value={court.name}
+                        onChange={(e) => handleRenameCourt(court.id, e.target.value)}
+                        className="font-bold text-sm bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-zinc-400 rounded px-1 w-28"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleCallCourtVoice(court)}
+                      title="發起語音叫場廣播"
+                      className="text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                    >
+                      📢 廣播
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 my-2">
+                    {[0, 1, 2, 3].map((slotIdx) => {
+                      const playerId = court.players[slotIdx];
+                      const player = players.find(p => p.id === playerId);
+
+                      return (
+                        <div
+                          key={slotIdx}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => onDropToSlot(e, 'court', court.id, slotIdx)}
+                          className={`p-2 rounded border text-center transition min-h-[52px] flex flex-col justify-center relative ${
+                            player
+                              ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600'
+                              : 'bg-dashed border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 text-xs'
+                          }`}
+                        >
+                          {player ? (
+                            <div>
+                              <p className="font-bold text-xs truncate">{player.name}</p>
+                              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
+                                Lv.{player.level} • {player.planId}
+                              </span>
+                            </div>
+                          ) : (
+                            <span>+ 拖拽球友</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                  <button
+                    onClick={() => handleFinishMatch(court)}
+                    className="w-full py-1.5 text-xs font-semibold rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-90 transition"
+                  >
+                    ✓ 完成比賽 & 叫下一組
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {queues.map((queue) => (
+              <div 
+                key={queue.id} 
+                className="bg-zinc-50 dark:bg-zinc-900/60 rounded-lg border-2 border-dashed border-amber-400/60 dark:border-amber-600/60 p-4 shadow-sm flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex justify-between items-center pb-2 mb-3 border-b border-zinc-200 dark:border-zinc-800">
+                    <span className="font-bold text-sm text-amber-600 dark:text-amber-400">
+                      ⏳ {queue.name}
+                    </span>
+                    <span className="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                      候場區
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 my-2">
+                    {[0, 1, 2, 3].map((slotIdx) => {
+                      const playerId = queue.players[slotIdx];
+                      const player = players.find(p => p.id === playerId);
+
+                      return (
+                        <div
+                          key={slotIdx}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => onDropToSlot(e, 'queue', queue.id, slotIdx)}
+                          className={`p-2 rounded border text-center transition min-h-[52px] flex flex-col justify-center ${
+                            player
+                              ? 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600'
+                              : 'bg-dashed border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 text-xs'
+                          }`}
+                        >
+                          {player ? (
+                            <div>
+                              <p className="font-bold text-xs truncate">{player.name}</p>
+                              <span className="text-[10px] text-zinc-500 font-mono">Lv.{player.level}</span>
+                            </div>
+                          ) : (
+                            <span>+ 預排卡</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const emptyCourt = courts.find(c => c.players.length === 0);
+                    if (!emptyCourt) {
+                      showToast('目前無空球場可推送預排！');
+                      return;
+                    }
+                    setCourts(courts.map(c => c.id === emptyCourt.id ? { ...c, players: queue.players, status: 'playing', startTime: Date.now() } : c));
+                    setQueues(queues.map(q => q.id === queue.id ? { ...q, players: [] } : q));
+                  }}
+                  className="mt-3 w-full py-1 text-xs font-medium rounded border border-amber-500 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950 transition"
+                >
+                  推送至空場地 ➔
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom Section: Player Roster with Stacked Filters */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm p-4 space-y-4">
+              
+              {/* Filter Bar: Status Tabs + Plan Selector + Search */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                
+                {/* Status Tabs */}
+                <div className="flex space-x-1 text-xs font-medium overflow-x-auto custom-scrollbar py-1">
+                  <button
+                    onClick={() => setFilterTab('all')}
+                    className={`px-2.5 py-1 rounded whitespace-nowrap ${filterTab === 'all' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                  >
+                    全部 ({players.length})
+                  </button>
+                  <button
+                    onClick={() => setFilterTab('checked_in')}
+                    className={`px-2.5 py-1 rounded whitespace-nowrap ${filterTab === 'checked_in' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                  >
+                    已報到 ({players.filter(p => p.status === 'checked_in').length})
+                  </button>
+                  <button
+                    onClick={() => setFilterTab('unchecked')}
+                    className={`px-2.5 py-1 rounded whitespace-nowrap ${filterTab === 'unchecked' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                  >
+                    未報到 ({players.filter(p => p.status === 'unchecked').length})
+                  </button>
+                  <button
+                    onClick={() => setFilterTab('resting')}
+                    className={`px-2.5 py-1 rounded whitespace-nowrap ${filterTab === 'resting' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                  >
+                    休息中 ({players.filter(p => p.status === 'resting').length})
+                  </button>
+                  <button
+                    onClick={() => setFilterTab('time_up')}
+                    className={`px-2.5 py-1 rounded whitespace-nowrap ${filterTab === 'time_up' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                  >
+                    時間到 ({players.filter(p => p.status === 'time_up').length})
+                  </button>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {/* Plan Filter Dropdown */}
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-zinc-500 font-semibold hidden sm:inline">方案:</span>
+                    <select
+                      value={selectedPlanFilter}
+                      onChange={(e) => setSelectedPlanFilter(e.target.value)}
+                      className="px-2.5 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 focus:outline-none font-medium text-zinc-800 dark:text-zinc-200"
+                    >
+                      <option value="all">依方案篩選：全部</option>
+                      {eventConfig.plans.map(p => (
+                        <option key={p.id} value={p.id}>方案 {p.id} ({p.timeStart}-{p.timeEnd})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Search Input */}
+                  <input
+                    type="text"
+                    placeholder="搜尋姓名..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="px-2.5 py-1 text-xs rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 focus:outline-none w-28 sm:w-32"
+                  />
+                </div>
+              </div>
+
+              {/* Player Cards Draggable List */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[420px] overflow-y-auto custom-scrollbar p-1">
+                {filteredPlayers.length === 0 ? (
+                  <p className="col-span-full text-center text-xs text-zinc-400 py-8">無符合篩選條件的球友</p>
+                ) : (
+                  filteredPlayers.map((player) => {
+                    const partner = players.find(p => p.id === player.boundWith);
+
+                    return (
+                      <div
+                        key={player.id}
+                        draggable
+                        onDragStart={(e) => onDragStartPlayer(e, player.id)}
+                        onClick={() => setContextPlayer(player)}
+                        className="p-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/80 hover:border-zinc-400 dark:hover:border-zinc-600 transition cursor-grab active:cursor-grabbing relative group flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-zinc-400 text-xs">⋮⋮</span>
+                            <span className="font-bold text-xs truncate">{player.name}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700">
+                              {player.planId}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                            <span>Lv.{player.level}</span>
+                            {partner && (
+                              <span className="text-sky-500 font-medium">🔗 {partner.name}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Status Indicator Bar */}
+                        <div className="mt-2 pt-1 border-t border-zinc-200 dark:border-zinc-700 flex justify-between items-center text-[10px]">
+                          <span>
+                            {player.status === 'checked_in' && <span className="text-emerald-500 font-semibold">● 在場</span>}
+                            {player.status === 'unchecked' && <span className="text-zinc-400">○ 未到</span>}
+                            {player.status === 'resting' && <span className="text-sky-400">☕ 休息</span>}
+                            {player.status === 'time_up' && <span className="text-rose-500 font-bold">🛑 時間到</span>}
+                          </span>
+                          <span className="text-zinc-400 group-hover:underline">選單</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Match Log / History */}
+            <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm p-4 flex flex-col">
+              <h3 className="text-sm font-semibold mb-3 pb-2 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                <span>📋 今日對戰歷史紀錄</span>
+                <span className="text-xs font-mono text-zinc-400">{matchHistory.length} 場次</span>
+              </h3>
+
+              <div className="flex-1 overflow-y-auto max-h-[400px] custom-scrollbar space-y-3">
+                {matchHistory.length === 0 ? (
+                  <p className="text-xs text-zinc-400 text-center py-8">目前尚無比賽完成紀錄</p>
+                ) : (
+                  matchHistory.map((item) => (
+                    <div key={item.id} className="p-3 rounded-md bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 text-xs">
+                      <div className="flex justify-between text-zinc-500 mb-1 font-mono">
+                        <span>{item.courtName}</span>
+                        <span>{item.endTime}</span>
+                      </div>
+                      <div className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        {item.teamA.join('/')} <span className="text-zinc-400 mx-1">VS</span> {item.teamB.join('/')}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function CheckInTab({ eventConfig, players, setPlayers, selectedCheckInIds, setSelectedCheckInIds, showToast }) {
+      const [showQRModal, setShowQRModal] = useState(false);
+      const [showImportModal, setShowImportModal] = useState(false);
+      const [selectedPlanFilter, setSelectedPlanFilter] = useState('all');
+
+      const handleToggleSelect = (id) => {
+        if (selectedCheckInIds.includes(id)) {
+          setSelectedCheckInIds(selectedCheckInIds.filter(x => x !== id));
+        } else {
+          setSelectedCheckInIds([...selectedCheckInIds, id]);
+        }
+      };
+
+      const handleBatchCheckIn = (payMethod = '') => {
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        setPlayers(players.map(p => {
+          if (selectedCheckInIds.includes(p.id)) {
+            const plan = eventConfig.plans.find(pl => pl.id === p.planId);
+            const chosenPay = payMethod || (plan ? plan.defaultPayment : '');
+            return {
+              ...p,
+              status: 'checked_in',
+              paid: true,
+              paymentMethod: chosenPay,
+              checkInTime: now
+            };
+          }
+          return p;
+        }));
+
+        showToast(`已成功替 ${selectedCheckInIds.length} 位球友完成報到！`);
+        setSelectedCheckInIds([]);
+      };
+
+      const handleBindTwoPlayers = () => {
+        if (selectedCheckInIds.length !== 2) return;
+        const [id1, id2] = selectedCheckInIds;
+
+        setPlayers(players.map(p => {
+          if (p.id === id1) return { ...p, boundWith: id2 };
+          if (p.id === id2) return { ...p, boundWith: id1 };
+          return p;
+        }));
+
+        showToast('已成功綁定這兩位球友為同隊搭檔！');
+        setSelectedCheckInIds([]);
+      };
+
+      const filteredPlayers = players.filter(p => {
+        if (selectedPlanFilter !== 'all' && p.planId !== selectedPlanFilter) return false;
+        return true;
+      });
+
+      return (
+        <div className="space-y-4 relative pb-24">
+          <div className="bg-white dark:bg-zinc-900 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 className="text-base font-bold">現場快速報到櫃檯</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">點擊卡片可多選球友，進行一鍵報到或同隊綁定。</p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* Plan Filter in Check-in Tab */}
+              <select
+                value={selectedPlanFilter}
+                onChange={(e) => setSelectedPlanFilter(e.target.value)}
+                className="px-2.5 py-1.5 text-xs rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-medium"
+              >
+                <option value="all">依方案篩選：全部</option>
+                {eventConfig.plans.map(p => (
+                  <option key={p.id} value={p.id}>方案 {p.id}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => setShowQRModal(true)}
+                className="px-3 py-1.5 text-xs font-semibold rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition flex items-center space-x-1"
+              >
+                <span>📷 掃碼報到</span>
+              </button>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="px-3 py-1.5 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-700 text-white transition flex items-center space-x-1"
+              >
+                <span>📥 匯入名單</span>
+              </button>
+              <button
+                onClick={() => setSelectedCheckInIds(filteredPlayers.map(p => p.id))}
+                className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white underline pl-2"
+              >
+                全選
+              </button>
+            </div>
+          </div>
+
+          {/* Compact Tiles Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {filteredPlayers.map((player) => {
+              const isSelected = selectedCheckInIds.includes(player.id);
+              const plan = eventConfig.plans.find(pl => pl.id === player.planId);
+              const partner = players.find(p => p.id === player.boundWith);
+
+              return (
+                <div
+                  key={player.id}
+                  onClick={() => handleToggleSelect(player.id)}
+                  className={`p-3 rounded-lg border transition cursor-pointer relative flex flex-col justify-between min-h-[110px] ${
+                    isSelected
+                      ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-200 dark:bg-zinc-800 ring-2 ring-zinc-500'
+                      : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-400'
+                  }`}
+                >
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] flex items-center justify-center font-bold">
+                      ✓
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="font-bold text-sm truncate">{player.name}</span>
+                      <span className="text-[10px] px-1 rounded bg-zinc-100 dark:bg-zinc-800 font-mono font-bold">
+                        {player.planId}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                      Lv.{player.level} • {player.gender === 'M' ? '男' : '女'}
+                    </div>
+
+                    {partner && (
+                      <p className="text-[10px] text-sky-500 mt-1 truncate">
+                        🔗 搭配: {partner.name}
+                      </p>
+                    )}
+
+                    {player.notes && (
+                      <p className="text-[10px] text-amber-500 mt-0.5 truncate" title={player.notes}>
+                        📝 {player.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-2 pt-1 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center text-[10px]">
+                    <span>
+                      {player.status === 'checked_in' ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">已報到</span>
+                      ) : (
+                        <span className="text-zinc-400">未報到</span>
+                      )}
+                    </span>
+
+                    {eventConfig.enableAccounting && (
+                      <span>
+                        {player.paid ? (
+                          <span className="text-zinc-400">已付</span>
+                        ) : (
+                          <span className="text-amber-600 font-bold">${plan ? plan.price : 0}</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Floating Action Bar */}
+          {selectedCheckInIds.length > 0 && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-6 py-3 rounded-full shadow-2xl flex items-center space-x-4 border border-zinc-700 dark:border-zinc-300">
+              <span className="text-xs font-bold font-mono">
+                已選擇 {selectedCheckInIds.length} 人
+              </span>
+
+              <button
+                onClick={() => handleBatchCheckIn()}
+                className="px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow"
+              >
+                一鍵完成報到
+              </button>
+
+              {selectedCheckInIds.length === 2 && (
+                <button
+                  onClick={handleBindTwoPlayers}
+                  className="px-4 py-1.5 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition"
+                >
+                  🔗 綁定兩人為同隊
+                </button>
+              )}
+
+              <button
+                onClick={() => setSelectedCheckInIds([])}
+                className="text-xs text-zinc-400 dark:text-zinc-600 hover:underline"
+              >
+                取消
+              </button>
+            </div>
+          )}
+
+          {/* Fake QR Code Modal */}
+          {showQRModal && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 max-w-sm w-full space-y-4 text-center shadow-2xl">
+                <h3 className="font-bold text-base">📷 掃碼報到功能預覽</h3>
+                <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl inline-block border border-zinc-200 dark:border-zinc-700">
+                  <svg className="w-48 h-48 mx-auto" viewBox="0 0 100 100" fill="currentColor">
+                    <path d="M0,0 h30 v30 h-30 z M5,5 v20 h20 v-20 z M10,10 h10 v10 h-10 z" />
+                    <path d="M70,0 h30 v30 h-30 z M75,5 v20 h20 v-20 z M80,10 h10 v10 h-10 z" />
+                    <path d="M0,70 h30 v30 h-30 z M5,75 v20 h20 v-20 z M10,80 h10 v10 h-10 z" />
+                    <rect x="35" y="5" width="10" height="20" />
+                    <rect x="50" y="15" width="15" height="10" />
+                    <rect x="35" y="35" width="30" height="10" />
+                    <rect x="5" y="35" width="20" height="10" />
+                    <rect x="75" y="35" width="20" height="15" />
+                    <rect x="35" y="50" width="10" height="30" />
+                    <rect x="50" y="55" width="20" height="10" />
+                    <rect x="75" y="55" width="15" height="20" />
+                    <rect x="50" y="75" width="35" height="10" />
+                    <rect x="40" y="90" width="20" height="10" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-800 dark:text-zinc-200">此功能即將推出</p>
+                  <p className="text-xs text-zinc-500 mt-1">未來球友展示專屬 QR Code 即可快速感應報到</p>
+                </div>
+                <button
+                  onClick={() => setShowQRModal(false)}
+                  className="w-full py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold rounded-lg text-xs"
+                >
+                  關閉
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Import Players Modal */}
+          {showImportModal && (
+            <ImportPlayersModal
+              onClose={() => setShowImportModal(false)}
+              onImport={(newPlayers) => {
+                setPlayers([...players, ...newPlayers]);
+                setShowImportModal(false);
+              }}
+              showToast={showToast}
+            />
+          )}
+        </div>
+      );
+    }
+
+    function ImportPlayersModal({ onClose, onImport, showToast }) {
+      const [rawText, setRawText] = useState('');
+
+      const handleProcessImport = () => {
+        if (!rawText.trim()) return;
+
+        const lines = rawText.split('\n');
+        const imported = [];
+
+        lines.forEach(line => {
+          let cleaned = line.trim();
+          if (!cleaned) return;
+
+          // 1. 去除行首的序號 (例如: "1.", "2、", "3)", "4/", "5-")
+          cleaned = cleaned.replace(/^\s*\d+[\.、\)\/,-]\s*/, '').trim();
+          if (!cleaned) return;
+
+          // 2. 切分欄位 (支援斜線、逗號、頓號、反斜線與 Tab 等)
+          const rawTokens = cleaned.split(/[/／,，、\\＼\t]+/);
+
+          let name = '';
+          let gender = 'M'; // 預設
+          let level = 7;   // 預設
+          let planId = 'A'; // 預設
+          let extraNotes = [];
+
+          let genderFound = false;
+          let levelFound = false;
+          let planFound = false;
+
+          rawTokens.forEach(token => {
+            const t = token.trim();
+            if (!t) return;
+            const tUpper = t.toUpperCase();
+
+            // 優先判斷性別 (M/F/男/女 優先於 方案字母判斷，防止 F 被誤判為方案代號)
+            if (!genderFound && (tUpper === 'M' || tUpper === 'F' || t === '男' || t === '女')) {
+              if (tUpper === 'M' || t === '男') gender = 'M';
+              if (tUpper === 'F' || t === '女') gender = 'F';
+              genderFound = true;
+              return;
+            }
+
+            // 判斷純數字為級數
+            if (!levelFound && /^\d+$/.test(t)) {
+              const lvl = parseInt(t, 10);
+              if (lvl > 0 && lvl <= 30) {
+                level = lvl;
+                levelFound = true;
+                return;
+              }
+            }
+
+            // 判斷單一個 A 到 Z 字母為方案代號
+            if (!planFound && /^[A-Za-z]$/.test(t)) {
+              planId = tUpper;
+              planFound = true;
+              return;
+            }
+
+            // 判斷姓名與備註 (第一個無法歸類的內容當作姓名，其餘丟進備註)
+            if (!name) {
+              name = t;
+            } else {
+              extraNotes.push(t);
+            }
+          });
+
+          if (!name) {
+            if (extraNotes.length > 0) {
+              name = extraNotes.shift();
+            } else {
+              name = '未命名球友';
+            }
+          }
+
+          imported.push({
+            id: 'P' + Date.now().toString().slice(-4) + Math.floor(Math.random() * 1000),
+            name,
+            gender,
+            level,
+            planId,
+            status: 'unchecked',
+            paid: false,
+            paymentMethod: '',
+            checkInTime: null,
+            boundWith: null,
+            notes: extraNotes.join(' / ')
+          });
+        });
+
+        if (imported.length > 0) {
+          onImport(imported);
+          showToast(`成功匯入 ${imported.length} 位球友！`);
+        } else {
+          showToast('未能成功解析任何球友資料，請檢查輸入內容。');
+        }
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-3">
+              <h3 className="font-bold text-base">📥 批次貼上匯入球友名單</h3>
+              <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">✕</button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <p className="text-zinc-500">
+                每行一位球友，<span className="font-bold text-zinc-800 dark:text-zinc-200">欄位順序可自由排列</span>（系統會自動辨識性別、純數字級數與方案代號）：
+              </p>
+              <div className="p-2.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-[11px] space-y-1 text-zinc-600 dark:text-zinc-400">
+                <p>支援任意順序與行首編號：</p>
+                <p>1. 張三 / 8 / 男 / A</p>
+                <p>2、李四，A方案，女，6</p>
+                <p>王五、10、F (自動優先判定女性與級數10)</p>
+              </div>
+
+              <textarea
+                rows="8"
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                placeholder="請在此貼上名單資料..."
+                className="w-full p-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+
+              <p className="text-[11px] text-zinc-400">
+                💡 支援斜線 `/` `／`、逗號 `,` `，`、頓號 `、`、反斜線 `\` `＼` 分隔。無法判斷的內容會自動存至球友備註欄位。
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end space-x-2">
+              <button onClick={onClose} className="px-4 py-2 text-xs rounded text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                取消
+              </button>
+              <button
+                onClick={handleProcessImport}
+                className="px-4 py-2 text-xs rounded bg-sky-600 hover:bg-sky-700 text-white font-bold transition"
+              >
+                確認匯入球友
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function EventConfigModal({ eventConfig, setEventConfig, onClose }) {
+      const [formData, setFormData] = useState({ ...eventConfig });
+      const [searchVenue, setSearchVenue] = useState('');
+      const [isCustomVenue, setIsCustomVenue] = useState(false);
+
+      const filteredVenues = TAIPEI_VENUES.filter(v => v.name.includes(searchVenue) || v.address.includes(searchVenue));
+
+      const ALL_PAYMENT_METHODS = ['現金', '轉帳', 'Line Pay', '球券'];
+
+      const handleTogglePaymentMethod = (method) => {
+        const current = formData.paymentMethods || [];
+        if (current.includes(method)) {
+          setFormData({ ...formData, paymentMethods: current.filter(m => m !== method) });
+        } else {
+          setFormData({ ...formData, paymentMethods: [...current, method] });
+        }
+      };
+
+      const handleAddPlan = () => {
+        const nextCode = String.fromCharCode(65 + formData.plans.length);
+        const newPlan = {
+          id: nextCode,
+          timeStart: '09:00',
+          timeEnd: '12:00',
+          price: 350,
+          defaultPayment: '現金'
+        };
+        setFormData({ ...formData, plans: [...formData.plans, newPlan] });
+      };
+
+      const handleSave = () => {
+        setEventConfig(formData);
+        onClose();
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-3">
+              <h2 className="text-lg font-bold">⚙️ 團主開團與活動詳細設定</h2>
+              <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">✕</button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Group Name & Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold mb-1">球團名稱</label>
+                  <input
+                    type="text"
+                    value={formData.groupName}
+                    onChange={(e) => setFormData({ ...formData, groupName: e.target.value })}
+                    className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">活動日期</label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                  />
+                </div>
+              </div>
+
+              {/* Open Registration Time & Court Count */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold mb-1">⏰ 開放報名時間</label>
+                  <input
+                    type="datetime-local"
+                    value={formData.openRegTime || ''}
+                    onChange={(e) => setFormData({ ...formData, openRegTime: e.target.value })}
+                    className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">🏟️ 場地數量</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={formData.courtCount || 3}
+                    onChange={(e) => setFormData({ ...formData, courtCount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Host Contact Info */}
+              <div>
+                <label className="block font-semibold mb-1">📞 團主聯絡資訊</label>
+                <input
+                  type="text"
+                  placeholder="例如：團主 Line: @badminton / 電話: 0912-345-678"
+                  value={formData.contactInfo || ''}
+                  onChange={(e) => setFormData({ ...formData, contactInfo: e.target.value })}
+                  className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                />
+              </div>
+
+              {/* Supported Payment Methods */}
+              <div>
+                <label className="block font-semibold mb-1">💳 支援付款方式 (複選)</label>
+                <div className="flex flex-wrap gap-3 p-3 rounded border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                  {ALL_PAYMENT_METHODS.map((method) => {
+                    const isChecked = (formData.paymentMethods || []).includes(method);
+                    return (
+                      <label key={method} className="flex items-center space-x-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleTogglePaymentMethod(method)}
+                          className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700"
+                        />
+                        <span className={`font-medium ${isChecked ? 'text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-400'}`}>
+                          {method}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SWITCH: Auto mark time-up by Plan timeEnd */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between">
+                <div className="pr-4">
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100">⏰ 依方案時間自動標記「時間到」</span>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    開啟後，時間屆滿時系統會自動將非在場上的球友標記為「時間到」；如球友正在場上比賽，將於按下完成比賽時才切換。
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formData.autoMarkTimeUp || false}
+                  onChange={(e) => setFormData({ ...formData, autoMarkTimeUp: e.target.checked })}
+                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                />
+              </div>
+
+              {/* Venue Selector */}
+              <div>
+                <label className="block font-semibold mb-1">球館選擇 (台北熱門羽球館清單或自訂)</label>
+                {!isCustomVenue ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="搜尋台北地區球館..."
+                      value={searchVenue}
+                      onChange={(e) => setSearchVenue(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                    />
+                    <select
+                      value={formData.venueName}
+                      onChange={(e) => setFormData({ ...formData, venueName: e.target.value })}
+                      className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                    >
+                      {filteredVenues.map((v, i) => (
+                        <option key={i} value={v.name}>{v.name} ({v.address})</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomVenue(true)}
+                      className="text-xs text-sky-500 hover:underline"
+                    >
+                      + 改為手動新增自訂球館
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="自訂球館名稱"
+                      value={formData.venueName}
+                      onChange={(e) => setFormData({ ...formData, venueName: e.target.value })}
+                      className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomVenue(false)}
+                      className="text-xs text-sky-500 hover:underline"
+                    >
+                      返回台北內建球館清單
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Plans (A, B, C...) */}
+              <div className="border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold">方案設定 (代號固定為 A, B, C...)</span>
+                  <button
+                    onClick={handleAddPlan}
+                    className="px-2 py-1 bg-zinc-200 dark:bg-zinc-700 rounded font-semibold"
+                  >
+                    + 新增方案
+                  </button>
+                </div>
+
+                {formData.plans.map((plan, idx) => (
+                  <div key={plan.id} className="flex items-center space-x-2 bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                    <span className="font-bold font-mono px-2 py-1 bg-zinc-200 dark:bg-zinc-700 rounded">
+                      {plan.id}
+                    </span>
+                    <input
+                      type="time"
+                      value={plan.timeStart}
+                      onChange={(e) => {
+                        const newP = [...formData.plans];
+                        newP[idx].timeStart = e.target.value;
+                        setFormData({ ...formData, plans: newP });
+                      }}
+                      className="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                    />
+                    <span>-</span>
+                    <input
+                      type="time"
+                      value={plan.timeEnd}
+                      onChange={(e) => {
+                        const newP = [...formData.plans];
+                        newP[idx].timeEnd = e.target.value;
+                        setFormData({ ...formData, plans: newP });
+                      }}
+                      className="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                    />
+                    <input
+                      type="number"
+                      value={plan.price}
+                      onChange={(e) => {
+                        const newP = [...formData.plans];
+                        newP[idx].price = Number(e.target.value);
+                        setFormData({ ...formData, plans: newP });
+                      }}
+                      className="w-20 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                    />
+                    <span>元</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Skill Range & Mode */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold mb-1">級數範圍 (1 ~ 18 級)</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="18"
+                      value={formData.skillMin}
+                      onChange={(e) => setFormData({ ...formData, skillMin: Number(e.target.value) })}
+                      className="w-20 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                    />
+                    <span>至</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="18"
+                      value={formData.skillMax}
+                      onChange={(e) => setFormData({ ...formData, skillMax: Number(e.target.value) })}
+                      className="w-20 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1">上場排點方式</label>
+                  <select
+                    value={formData.mode}
+                    onChange={(e) => setFormData({ ...formData, mode: e.target.value })}
+                    className="w-full px-3 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                  >
+                    <option value="system">🤖 系統排點 (自動建議組合)</option>
+                    <option value="manual">✋ 人工排點 (團主自由拉拽)</option>
+                    <option value="free">🎾 自由上場 (球友自理)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Accounting Function Switch */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg flex items-center justify-between">
+                <div>
+                  <span className="font-bold">開啟帳務記錄功能</span>
+                  <p className="text-[11px] text-zinc-500">關閉後所有應收/待收金錢相關欄位將於系統中隱藏。</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formData.enableAccounting}
+                  onChange={(e) => setFormData({ ...formData, enableAccounting: e.target.checked })}
+                  className="w-5 h-5"
+                />
+              </div>
+
+              {/* Shuttlecock & Notes */}
+              <div>
+                <label className="block font-semibold mb-1">指定用球</label>
+                <input
+                  type="text"
+                  value={formData.shuttlecock}
+                  onChange={(e) => setFormData({ ...formData, shuttlecock: e.target.value })}
+                  className="w-full px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">注意事項 / 簡介</label>
+                <textarea
+                  value={formData.notes}
+                  rows="3"
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                ></textarea>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end space-x-3">
+              <button onClick={onClose} className="px-4 py-2 rounded text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                取消
+              </button>
+              <button onClick={handleSave} className="px-4 py-2 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold">
+                儲存變更
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function PlayerContextModal({ player, players, setPlayers, onClose }) {
+      const [boundPartnerId, setBoundPartnerId] = useState(player.boundWith || '');
+
+      const handleSave = () => {
+        setPlayers(players.map(p => {
+          if (p.id === player.id) {
+            return { ...p, boundWith: boundPartnerId || null };
+          }
+          if (p.id === boundPartnerId) {
+            return { ...p, boundWith: player.id };
+          }
+          return p;
+        }));
+        onClose();
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 p-5 rounded-lg border border-zinc-200 dark:border-zinc-800 max-w-sm w-full space-y-4">
+            <h3 className="font-bold text-sm">快捷設定 - {player.name}</h3>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold mb-1">綁定固定搭檔 (同隊)</label>
+                <select
+                  value={boundPartnerId}
+                  onChange={(e) => setBoundPartnerId(e.target.value)}
+                  className="w-full p-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                >
+                  <option value="">無綁定搭檔</option>
+                  {players.filter(p => p.id !== player.id).map(p => (
+                    <option key={p.id} value={p.id}>{p.name} (Lv.{p.level})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">切換狀態</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setPlayers(players.map(p => p.id === player.id ? { ...p, status: 'checked_in' } : p));
+                      onClose();
+                    }}
+                    className="p-2 border rounded text-emerald-600 font-bold"
+                  >
+                    ● 設為已報到
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPlayers(players.map(p => p.id === player.id ? { ...p, status: 'resting' } : p));
+                      onClose();
+                    }}
+                    className="p-2 border rounded text-sky-500 font-bold"
+                  >
+                    ☕ 設為休息中
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <button onClick={onClose} className="px-3 py-1.5 text-xs text-zinc-500">取消</button>
+              <button onClick={handleSave} className="px-3 py-1.5 text-xs bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold rounded">
+                確認
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mount Root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

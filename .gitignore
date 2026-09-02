@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+.vite/
+.pnpm-store/
+*.tsbuildinfo
+.idea/
+.vscode/
+supabase/.temp/

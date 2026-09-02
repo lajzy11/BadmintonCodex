@@ -1,0 +1,1 @@
+export const UNARCHIVED_ACTIVITY_LIMIT = 5
